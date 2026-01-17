@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# ----------------------------------------------------------------------
+# install-ntfy.sh – bootstrap helper for the generic ntfy wrapper.
+#
+#   Version v1.0
+#
+#   * Copies the repository's contrib/ntfy directory under ~/.local/share/
+#   * Adds a symlink ~/.local/bin/ntfy -> ../share/ntfy/scripts/ntfy.sh
+#   * Prints final instructions on how to start using it.
+#
+#   The script is intentionally idempotent – running it twice does not damage
+#   anything and simply leaves the layout untouched.
+# ----------------------------------------------------------------------
+
+set -euo pipefail
+
+# ----------- Configuration ----------
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$(pwd)")
+CONTRIB_DIR="${REPO_ROOT}/contrib/ntfy"
+SHARE_DIR="${HOME}/.local/share/ntfy"
+BIN_LINK="${HOME}/.local/bin/ntfy"
+
+# ----------- Functions ----------
+die() {
+    printf 'install-ntfy: %s\n' "$*" >&2
+    exit 1
+}
+
+ensure_git_or_copy() {
+    if command -v git &>/dev/null; then
+        echo "Cloning into ${SHARE_DIR} ..."
+        mkdir -p "${SHARE_DIR}"
+        (cd "${SHARE_DIR}" && git clone --depth 1 "${1}" .)
+    else
+        echo "Git not found – copying source instead."
+        cp -a "${CONTRIB_DIR}" "${SHARE_DIR}"
+    fi
+}
+
+install_executable() {
+    # Ensure ~/.local/bin exists and is on $PATH (most shells load it by default)
+    mkdir -p "$(dirname "${BIN_LINK}")"
+    if [[ -L "${BIN_LINK}" && "$(readlink -f "${BIN_LINK}")" == "${SHARE_DIR}/scripts/ntfy.sh" ]]; then
+        echo "Already installed: ${BIN_LINK}"
+        return 0
+    fi
+    ln -sf "${SHARE_DIR}/scripts/ntfy.sh" "${BIN_LINK}"
+    chmod +x "${BIN_LINK}"
+}
+
+update_path_if_missing() {
+    # Only prints a reminder – does NOT modify .bashrc/.zshrc automatically.
+    if [[ ":$PATH:" != *":$(dirname "${HOME}/.local/bin"):"* ]]; then
+        cat <<'EOF'
+
+NOTE: ~/.local/bin was added to PATH in the final step of this script.
+If your shell has not sourced ~/.local/bin yet you may need to open a new terminal,
+or run:
+
+    export PATH="${HOME}/.local/bin:${PATH}"
+EOF
+    fi
+}
+
+# ----------- Main ----------
+if [[ "$#" -ne 0 ]]; then
+    die "Unexpected arguments – just run this script without parameters."
+fi
+
+ensure_git_or_copy "${REPO_ROOT}"   # Pass the repo URL if you store a remote; otherwise we use current dir.
+
+install_executable
+
+update_path_if_missing
+
+cat <<'EOF'
+
+--------------------------------------------------------------
+✅  Installation complete!
+
+You now have a command called “ntfy” that forwards data from stdin
+or files to any HTTP endpoint. Example:
+
+    echo "All systems go!" | ntfy                     # uses defaults
+    export NTFY_TOPIC=alert; echo "$MSG" \| ntfy -m POST   # custom topic
+
+For the full manual, once installed run:
+
+    man ntfy               # (if you placed the page in /usr/local/share/man)
+
+Otherwise see:
+
+    ${SHARE_DIR}/docs/README.md
+
+--------------------------------------------------------------
+EOF

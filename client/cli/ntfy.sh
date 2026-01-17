@@ -205,86 +205,86 @@ while [[ $# -gt 0 ]]; do
         # header / ntfy options (all turned into -H)
         --title)
             [[ $# -lt 2 ]] && error_exit "Missing value for --title" 1
-            HEADERS+=(-H "X-Title: $2")
+            HEADERS+=(-H "Title: $2")
             shift 2
             ;;
         --sid)
             [[ $# -lt 2 ]] && error_exit "Missing value for --sid" 1
-            HEADERS+=(-H "X-Sequence-ID: $2")
+            HEADERS+=(-H "Sequence-ID: $2")
             shift 2
             ;;
         --priority)
             [[ $# -lt 2 ]] && error_exit "Missing value for --priority" 1
-            HEADERS+=(-H "X-Priority: $2")
+            HEADERS+=(-H "Priority: $2")
             shift 2
             ;;
         --tags)
             [[ $# -lt 2 ]] && error_exit "Missing value for --tags" 1
-            HEADERS+=(-H "X-Tags: $2")
+            HEADERS+=(-H "Tags: $2")
             shift 2
             ;;
         --delay)
             [[ $# -lt 2 ]] && error_exit "Missing value for --delay" 1
-            HEADERS+=(-H "X-Delay: $2")
+            HEADERS+=(-H "Delay: $2")
             shift 2
             ;;
         --actions)
             [[ $# -lt 2 ]] && error_exit "Missing value for --actions" 1
-            HEADERS+=(-H "X-Actions: $2")
+            HEADERS+=(-H "Actions: $2")
             shift 2
             ;;
         --click)
             [[ $# -lt 2 ]] && error_exit "Missing value for --click" 1
-            HEADERS+=(-H "X-Click: $2")
+            HEADERS+=(-H "Click: $2")
             shift 2
             ;;
         --attach)
             [[ $# -lt 2 ]] && error_exit "Missing value for --attach" 1
-            HEADERS+=(-H "X-Attach: $2")
+            HEADERS+=(-H "Attach: $2")
             shift 2
             ;;
         --markdown)
-            HEADERS+=(-H "X-Markdown: true")
+            HEADERS+=(-H "Markdown: true")
             shift 1
             ;;
         --icon)
             [[ $# -lt 2 ]] && error_exit "Missing value for --icon" 1
-            HEADERS+=(-H "X-Icon: $2")
+            HEADERS+=(-H "Icon: $2")
             shift 2
             ;;
         --filename)
             [[ $# -lt 2 ]] && error_exit "Missing value for --filename" 1
-            HEADERS+=(-H "X-Filename: $2")
+            HEADERS+=(-H "Filename: $2")
             shift 2
             ;;
         --email)
             [[ $# -lt 2 ]] && error_exit "Missing value for --email" 1
-            HEADERS+=(-H "X-Email: $2")
+            HEADERS+=(-H "Email: $2")
             shift 2
             ;;
         --call)
             [[ $# -lt 2 ]] && error_exit "Missing value for --call" 1
-            HEADERS+=(-H "X-Call: $2")
+            HEADERS+=(-H "Call: $2")
             shift 2
             ;;
         --cache)
             [[ $# -lt 2 ]] && error_exit "Missing value for --cache" 1
-            HEADERS+=(-H "X-Cache: $2")
+            HEADERS+=(-H "Cache: $2")
             shift 2
             ;;
         --firebase)
             [[ $# -lt 2 ]] && error_exit "Missing value for --firebase" 1
-            HEADERS+=(-H "X-Firebase: $2")
+            HEADERS+=(-H "Firebase: $2")
             shift 2
             ;;
         --up)
             [[ $# -lt 2 ]] && error_exit "Missing value for --up" 1
-            HEADERS+=(-H "X-UnifiedPush: $2")
+            HEADERS+=(-H "UnifiedPush: $2")
             shift 2
             ;;
         --poll-id)
             [[ $# -lt 2 ]] && error_exit "Missing value for --poll-id" 1
-            HEADERS+=(-H "X-Poll-ID: $2")
+            HEADERS+=(-H "Poll-ID: $2")
             shift 2
             ;;
         --auth)

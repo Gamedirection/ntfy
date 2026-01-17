@@ -1,35 +1,33 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------
-# ntfy.sh  –  Tiny helper to publish messages to an external “ntfy”
-#             (or any HTTP‑push) endpoint.
+# ntfy.sh – Tiny helper to publish messages to an ntfy (or HTTP) endpoint
 #
-#   Version 1.0
+#   Version v1
 #
-#   It is deliberately *generic*: the target URL, authentication,
-#   and optional topic are all supplied via environment variables or CLI flags,
-#   so downstream projects can invoke it without pulling in any extra
-#   dependencies.
+#   Generic, repo-agnostic wrapper around curl:
+#     - URL can be given directly (-u / --url)
+#     - or built from a topic name (-t / --topic, or $NTFY_TOPIC)
 #
-#   Usage:
-#       echo "Hello world" | ./ntfy.sh                     # use defaults
-#       echo "$MSG" | ./ntfy.sh --topic myTopic              # custom topic
-#       echo "$DATA" | ./ntfy.sh -u https://my.server/api/1  # custom URL
+#   Defaults:
+#     BASE:   https://ntfy.sh
+#     TOPIC:  ${NTFY_TOPIC:-general}
 #
-#   The script tries to be POSIX‑compliant and works on any system that
-#   ships Bash (or Dash) plus curl. No external libraries are required.
+#   Examples:
+#     echo "Hello world" | ntfy
+#     echo "Warning!"     | ntfy -t sysalerts
+#     echo "JSON"         | ntfy -u https://ntfy.gd-short.net/life
 #
-#   Exit codes:
-#       0 – successful POST
-#       1 – missing input / malformed arguments
+#   Credits: GameDirection @ Alex Sierputowski
 # ----------------------------------------------------------------------
 
 set -euo pipefail
 
 # ---------- Default configuration ----------
-# These can be overridden from the command line or environment.
-DEFAULT_URL="https://ntfy.sh/${NTFY_TOPIC:-general}"
+BASE_URL="${NTFY_BASE_URL:-https://ntfy.sh}"
+DEFAULT_TOPIC="${NTFY_TOPIC:-general}"
+DEFAULT_URL="${BASE_URL%/}/${DEFAULT_TOPIC}"
 DEFAULT_METHOD="POST"
-CURL_OPTS=("-sS" "-w" "\n%{http_code}")
+CURL_OPTS=(-sS)
 
 # ---------- Helper functions ----------
 usage() {
@@ -37,101 +35,119 @@ usage() {
 Usage: $(basename "$0") [options] < /dev/stdin
 
 Options:
-  -u, --url   HTTP(S) endpoint to POST data (default: $DEFAULT_URL)
-  -m, --method   curl method (default: \"${DEFAULT_METHOD}\")
-      The script accepts only GET or POST; any other value falls back to POST.
-  -t, --topic   overrides the environment variable NTFY_TOPIC
-                (used if no explicit URL is provided)
-  -h, --help    Show this help and exit
+  -u, --url URL      HTTP(S) endpoint to POST data to.
+                     If omitted, defaults to: ${DEFAULT_URL}
+
+  -t, --topic NAME   Topic name; used only when --url is not given.
+                     Default topic: ${DEFAULT_TOPIC}
+                     Effective URL: BASE_URL/TOPIC
+
+  -m, --method M     HTTP method: GET or POST (default: ${DEFAULT_METHOD})
+  -h, --help         Show this help and exit.
+
+Environment:
+  NTFY_BASE_URL   Base URL (default: https://ntfy.sh)
+  NTFY_TOPIC      Default topic (default: general)
 
 Examples:
-  # Send from a pipe
-  echo "All clear" | ./ntfy.sh                              
-
-  # Use a custom topic name only
-  export NTFY_TOPIC=myTeamAlert
-  echo "Watch out!" | ./ntfy.sh -u \"https://ntfy.sh/\${NTFY_TOPIC}\"
-
-  # Post JSON with a different method (rare but allowed)
-  printf '{\"text\":\"boom\"}' | ./ntfy.sh --method POST -u https://example.com/api
+  echo "All clear" | ntfy
+  echo "Watch out!" | ntfy -t myTeamAlert
+  printf '{"text":"boom"}' | ntfy -u https://example.com/api --method POST
 
 Exit status:
-  0   Success
-  1   Invalid usage
-  >1  Curl error (curl returns non‑zero exit code)
-
+  0   Success (2xx/3xx)
+  1   Invalid usage (no stdin, bad options)
+  >1  curl error or unexpected HTTP status
 EOF
 }
 
 error_exit() {
-    printf 'ntfy: %s\n' "$*" >&2
+    printf 'ntfy: %s\n' "$1" >&2
     exit "${2:-1}"
 }
-# -------------------------------------------
 
 # ---------- Argument parsing ----------
-topic_arg=false
-method_opt="${DEFAULT_METHOD}"
+URL_ARG=""
+TOPIC_ARG=""
+METHOD_OPT="${DEFAULT_METHOD}"
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -u|--url)   URL_ARG="$2"; shift 2 ;;
-        -m|--method) method_opt="$2"; shift 2 ;;
-        -t|--topic) topic_arg=true; shift ;;
-        -h|--help) usage; exit 0 ;;
-        *) error_exit "Unknown option: $1" ;;
+        -u|--url)
+            [[ $# -lt 2 ]] && error_exit "Missing argument for $1" 1
+            URL_ARG="$2"
+            shift 2
+            ;;
+        -t|--topic)
+            [[ $# -lt 2 ]] && error_exit "Missing argument for $1" 1
+            TOPIC_ARG="$2"
+            shift 2
+            ;;
+        -m|--method)
+            [[ $# -lt 2 ]] && error_exit "Missing argument for $1" 1
+            METHOD_OPT="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            error_exit "Unknown option: $1" 1
+            ;;
     esac
 done
 
-# If a custom URL is supplied, use it verbatim.
-if [[ "${URL_ARG:-}" ]]; then
-    TARGET_URL="${URL_ARG}"
+# Decide target URL
+if [[ -n "$URL_ARG" ]]; then
+    TARGET_URL="$URL_ARG"
 else
-    # Otherwise build the default ntfy.sh address from the optional topic flag
-    if $topic_arg; then
-        export NTFY_TOPIC="$2"; shift 2   # --topic takes a value
-    fi
-    TARGET_URL="${DEFAULT_URL}"
+    TOPIC="${TOPIC_ARG:-$DEFAULT_TOPIC}"
+    TARGET_URL="${BASE_URL%/}/${TOPIC}"
 fi
 
-# Validate method – only GET and POST are accepted.
-if [[ "$method_opt" != "GET" && "$method_opt" != "POST" ]]; then
-    error_exit "Method must be GET or POST (got \"${method_opt}\")"
-fi
+# Validate method
+case "$METHOD_OPT" in
+    GET|POST) ;;
+    *) error_exit "Method must be GET or POST (got \"$METHOD_OPT\")" 1 ;;
+esac
 
 # ---------- Read from stdin ----------
-# Guard against an empty stream; curl can handle binary data, but we want a sane exit.
 if [ -t 0 ]; then
-    # No pipeline – require explicit non‑empty argument?
-    error_exit "No data on stdin. Pipe some text into this script."
+    # No data piped in
+    usage
+    error_exit "No data on stdin. Pipe a message into this command." 1
 fi
 
-# Capture the full payload (preserving newlines) in a temporary file.
-TMP_PAYLOAD=$(mktemp)
+TMP_PAYLOAD="$(mktemp)"
 cat > "$TMP_PAYLOAD"
 
 # ---------- Invoke curl ----------
-case "$method_opt" in
-    POST)
-        RESPONSE_CODE=$(curl "${CURL_OPTS[@]}" -X POST \
-                         --data-binary @"$TMP_PAYLOAD" \
-                         -o /dev/null \
-                         -w "%{http_code}" "${TARGET_URL}")
-        ;;
-    GET)
-        # For a GET we do *not* send a body; just request the URL with a query string
-        # that can be used to embed data (e.g. ?msg=...). The script assumes no
-        # parameters are added by the caller.
-        RESPONSE_CODE=$(curl "${CURL_OPTS[@]}" -X GET \
-                         -o /dev/null \
-                         -w "%{http_code}" "${TARGET_URL}")
-esac
+HTTP_CODE=""
+if [[ "$METHOD_OPT" == "POST" ]]; then
+    HTTP_CODE="$(
+        curl "${CURL_OPTS[@]}" \
+             -X POST \
+             --data-binary @"$TMP_PAYLOAD" \
+             -o /dev/null \
+             -w '%{http_code}' \
+             "$TARGET_URL"
+    )"
+else
+    HTTP_CODE="$(
+        curl "${CURL_OPTS[@]}" \
+             -X GET \
+             -o /dev/null \
+             -w '%{http_code}' \
+             "$TARGET_URL"
+    )"
+fi
 
-# Clean up
 rm -f "$TMP_PAYLOAD"
 
-if [[ "$RESPONSE_CODE" -ge 200 && "$RESPONSE_CODE" -lt 400 ]]; then
-    echo "ntfy: message sent successfully (HTTP $RESPONSE_CODE)" >&2
+if [[ "$HTTP_CODE" =~ ^2|3[0-9]{2}$ ]] || [[ "$HTTP_CODE" -ge 200 && "$HTTP_CODE" -lt 400 ]]; then
+    printf 'ntfy: message sent successfully (HTTP %s)\n' "$HTTP_CODE" >&2
     exit 0
 else
-    error_exit "curl returned unexpected HTTP status ${RESPONSE_CODE}" 2
+    error_exit "Unexpected HTTP status ${HTTP_CODE} from ${TARGET_URL}" 2
 fi

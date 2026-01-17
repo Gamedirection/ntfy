@@ -137,7 +137,7 @@ and are read on every run.
 ### Set your base URL
 
 ```bash
-ntfy -su https://ntfy.gd-short.net
+ntfy -su https://ntfy.your-domain.com
 ```
 
 ### Set your default topic
@@ -161,7 +161,7 @@ ntfy "Hi from defaults"
 will POST to:
 
 ```text
-https://ntfy.gd-short.net/life
+https://ntfy.your-domain.com/life
 ```
 
 ### Inspect current effective values
@@ -185,7 +185,7 @@ You can override defaults at any time per call.
 
 ```bash
 ntfy -st life                      # one-time setup (optional)
-ntfy -t Monopoly "Monopoly event"  # -> BASE_URL/Monopoly
+ntfy -t MyTopic "MyTopic event"  # -> BASE_URL/MyTopic
 ```
 
 ### Send to a fully-specified URL
@@ -193,19 +193,19 @@ ntfy -t Monopoly "Monopoly event"  # -> BASE_URL/Monopoly
 If you pass a full URL that already includes the topic:
 
 ```bash
-ntfy -u https://ntfy.gd-short.net/Monopoly "hello from DND"
+ntfy -u https://ntfy.your-domain.com/MyTopic "hello from $HOSTNAME"
 ```
 
 If you prefer to pass **base URL + topic separately**, the script can combine them:
 
 ```bash
-ntfy -u https://ntfy.gd-short.net -t Monopoly "hello from DND"
+ntfy -u https://ntfy.your-domain.com -t MyTopic "hello from $HOSTNAME"
 ```
 
-The CLI detects a “bare” base (no path) and appends `/Monopoly`, resulting in:
+The CLI detects a “bare” base (no path) and appends `/MyTopic`, resulting in:
 
 ```text
-https://ntfy.gd-short.net/Monopoly
+https://ntfy.your-domain.com/MyTopic
 ```
 
 ### Using stdin vs arguments
@@ -242,7 +242,7 @@ https://ntfy.gd-short.net/Monopoly
 `~/.config/ntfy-cli.conf` is a small shell snippet the CLI sources:
 
 ```bash
-CFG_BASE_URL='https://ntfy.gd-short.net'
+CFG_BASE_URL='https://ntfy.your-domain.com'
 CFG_TOPIC='life'
 CFG_METHOD='POST'
 ```

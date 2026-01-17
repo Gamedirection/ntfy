@@ -12,16 +12,36 @@
 #     -st / --set-topic TOPIC
 #     -sm / --set-method M
 #
-#   Message:
+#   Message body:
 #     - from stdin (echo "msg" | ntfy)
 #     - or from remaining command-line args (ntfy "Hello World")
 #
+#   Message headers / ntfy options (all become curl -H headers):
+#     --title TEXT           X-Title
+#     --sid ID               X-Sequence-ID
+#     --priority N           X-Priority
+#     --tags TAGS            X-Tags
+#     --delay VALUE          X-Delay (at/in)
+#     --actions STR          X-Actions
+#     --click URL            X-Click
+#     --attach URL           X-Attach
+#     --markdown             X-Markdown: true
+#     --icon URL             X-Icon
+#     --filename NAME        X-Filename
+#     --email ADDRESS        X-Email
+#     --call NUMBER          X-Call
+#     --cache VALUE          X-Cache
+#     --firebase VALUE       X-Firebase
+#     --up VALUE             X-UnifiedPush
+#     --poll-id ID           X-Poll-ID
+#     --auth TOKEN           Authorization: Bearer TOKEN
+#     --content-type TYPE    Content-Type
+#
 #   Credits: GameDirection @ Alex Sierputowski
 # ----------------------------------------------------------------------
-
 set -euo pipefail
 
-VERSION="1.3"
+VERSION="1.4"
 CONFIG_FILE="${HOME}/.config/ntfy-cli.conf"
 
 # ---------- load config (if any) ----------
@@ -38,7 +58,9 @@ CUR_METHOD="${CFG_METHOD:-POST}"
 # One-shot overrides from CLI
 CUR_URL=""
 
+# curl options and headers
 CURL_OPTS=(-sS)
+HEADERS=()    # array of -H "Header: value"
 
 usage() {
     cat <<EOF >&2
@@ -47,20 +69,39 @@ Usage:
   echo "msg" | ntfy [flags]
 
 Runtime options:
-  -u, --url [URL]      HTTP(S) endpoint to POST data to.
+  -u, --url [URL]      HTTP(S) endpoint to send data to.
                        If omitted, defaults to: \$(current-url)
-                       If used *without* URL, prints current effective URL.
-
-  -t, --topic [NAME]   Topic name; used only when --url is not given.
-                       If used *without* NAME, prints current topic.
-
+                       If used without URL, prints current effective URL.
+  -t, --topic [NAME]   Topic name; used when --url is not given.
+                       If used without NAME, prints current topic.
   -m, --method [M]     HTTP method: GET or POST (default: \$(current-method))
-                       If used *without* M, prints current method.
+                       If used without M, prints current method.
 
 Persistent defaults (saved in ${CONFIG_FILE}):
   -su, --set-url URL      Set default base URL.
   -st, --set-topic NAME   Set default topic.
   -sm, --set-method M     Set default method (GET or POST).
+
+Message headers / ntfy options:
+  --title TEXT           Set X-Title
+  --sid ID               Set X-Sequence-ID
+  --priority N           Set X-Priority
+  --tags TAGS            Set X-Tags (e.g. "warning,skull")
+  --delay VALUE          Set X-Delay (or at/in timestamp, e.g. "10m")
+  --actions STR          Set X-Actions
+  --click URL            Set X-Click
+  --attach URL           Set X-Attach
+  --markdown             Set X-Markdown: true
+  --icon URL             Set X-Icon
+  --filename NAME        Set X-Filename
+  --email ADDRESS        Set X-Email
+  --call NUMBER          Set X-Call
+  --cache VALUE          Set X-Cache
+  --firebase VALUE       Set X-Firebase
+  --up VALUE             Set X-UnifiedPush
+  --poll-id ID           Set X-Poll-ID
+  --auth TOKEN           Set Authorization: Bearer TOKEN
+  --content-type TYPE    Set Content-Type
 
 Other:
   -v, --version        Show version and exit.
@@ -70,7 +111,7 @@ Message:
   If stdin is not a TTY, body is read from stdin.
   Otherwise, any remaining arguments after flags form the message:
       ntfy "Hello World"
-      ntfy -u https://ntfy.gamedirection.net -t dogs "hello world"
+      ntfy -u https://ntfy.gd-short.net -t dogs "hello world"
 
 Environment overrides:
   NTFY_BASE_URL   Base URL
@@ -128,6 +169,7 @@ while [[ $# -gt 0 ]]; do
             save_config
             exit 0
             ;;
+
         # runtime flags (can also show current)
         -u|--url)
             if [[ $# -ge 2 && ! "$2" =~ ^- ]]; then
@@ -159,6 +201,103 @@ while [[ $# -gt 0 ]]; do
                 exit 0
             fi
             ;;
+
+        # header / ntfy options (all turned into -H)
+        --title)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --title" 1
+            HEADERS+=(-H "X-Title: $2")
+            shift 2
+            ;;
+        --sid)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --sid" 1
+            HEADERS+=(-H "X-Sequence-ID: $2")
+            shift 2
+            ;;
+        --priority)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --priority" 1
+            HEADERS+=(-H "X-Priority: $2")
+            shift 2
+            ;;
+        --tags)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --tags" 1
+            HEADERS+=(-H "X-Tags: $2")
+            shift 2
+            ;;
+        --delay)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --delay" 1
+            HEADERS+=(-H "X-Delay: $2")
+            shift 2
+            ;;
+        --actions)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --actions" 1
+            HEADERS+=(-H "X-Actions: $2")
+            shift 2
+            ;;
+        --click)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --click" 1
+            HEADERS+=(-H "X-Click: $2")
+            shift 2
+            ;;
+        --attach)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --attach" 1
+            HEADERS+=(-H "X-Attach: $2")
+            shift 2
+            ;;
+        --markdown)
+            HEADERS+=(-H "X-Markdown: true")
+            shift 1
+            ;;
+        --icon)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --icon" 1
+            HEADERS+=(-H "X-Icon: $2")
+            shift 2
+            ;;
+        --filename)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --filename" 1
+            HEADERS+=(-H "X-Filename: $2")
+            shift 2
+            ;;
+        --email)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --email" 1
+            HEADERS+=(-H "X-Email: $2")
+            shift 2
+            ;;
+        --call)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --call" 1
+            HEADERS+=(-H "X-Call: $2")
+            shift 2
+            ;;
+        --cache)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --cache" 1
+            HEADERS+=(-H "X-Cache: $2")
+            shift 2
+            ;;
+        --firebase)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --firebase" 1
+            HEADERS+=(-H "X-Firebase: $2")
+            shift 2
+            ;;
+        --up)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --up" 1
+            HEADERS+=(-H "X-UnifiedPush: $2")
+            shift 2
+            ;;
+        --poll-id)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --poll-id" 1
+            HEADERS+=(-H "X-Poll-ID: $2")
+            shift 2
+            ;;
+        --auth)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --auth" 1
+            HEADERS+=(-H "Authorization: Bearer $2")
+            shift 2
+            ;;
+        --content-type)
+            [[ $# -lt 2 ]] && error_exit "Missing value for --content-type" 1
+            HEADERS+=(-H "Content-Type: $2")
+            shift 2
+            ;;
+
         -v|--version)
             show_version
             exit 0
@@ -221,7 +360,7 @@ printf '%s' "$MSG" >"$TMP_PAYLOAD"
 
 if [[ "$CUR_METHOD" == "POST" ]]; then
     HTTP_CODE="$(
-        curl "${CURL_OPTS[@]}" \
+        curl "${CURL_OPTS[@]}" "${HEADERS[@]}" \
              -X POST \
              --data-binary @"$TMP_PAYLOAD" \
              -o /dev/null \
@@ -230,7 +369,7 @@ if [[ "$CUR_METHOD" == "POST" ]]; then
     )"
 else
     HTTP_CODE="$(
-        curl "${CURL_OPTS[@]}" \
+        curl "${CURL_OPTS[@]}" "${HEADERS[@]}" \
              -X GET \
              -o /dev/null \
              -w '%{http_code}' \
